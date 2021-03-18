@@ -1,0 +1,115 @@
+---
+title: 'Country Metrics + Top N Report'
+date: "`r format(Sys.time(), '%Y, %B, %d, %H:%M')`"
+params: 
+    metric: NA
+    variables: NA
+    dataset: NA
+    identity: NA
+    amount: NA
+    orient: NA
+    cat: NA
+    plotHeight: NA
+    plotWidth: NA
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+    collapse = TRUE,
+    comment = '#>',
+    fig.path = './figures/'
+)
+```
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+library(stringr)
+library(ggplot2)
+library(dplyr)
+
+#setup pixels -> inches
+plotWidthInches <- params$plotWidth * 0.0104166667
+plotHeightInches <- params$plotHeight * 0.0104166667
+```
+
+# Top N report
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Function to plot barplots for the top N countries tab
+topn_barplot <- function(dataset, identity, vars, orient, amount, cat) {
+    if (length(vars) == 1) {
+    if (orient == "Top") {
+        demTopN <- arrange_at(dem, vars[1], 'desc')
+        demTopN[,identity] <-  factor(demTopN[,identity], levels=demTopN[,identity])
+        } else {
+        demTopN <- arrange_at(dem, vars[1])
+        demTopN[,identity] <-  factor(demTopN[,identity], levels=demTopN[,identity])
+        }
+    plt <- ggplot(demTopN[1:amount,], aes_string(x=identity, y=vars[1]))+
+        ggtitle(str_interp("${orient} ${amount}: ${vars[1]}"))+
+        theme(axis.text.x = element_text(angle = 45))
+    if (cat == 1) {
+        plt + geom_bar(stat="identity", aes_string(fill="hdi_cat"))
+    } else {
+        plt + geom_bar(stat="identity")
+    }
+    } else {
+    plts <- list()
+    for (i in 1:length(vars)) {
+        if (orient == "Top") {
+        demTopN <- arrange_at(dem, vars[i], 'desc')
+        demTopN[,identity] <-  factor(demTopN[,identity], levels=demTopN[,identity])
+        } else {
+        demTopN <- arrange_at(dem, vars[i])
+        demTopN[,identity] <-  factor(demTopN[,identity], levels=demTopN[,identity])
+        }
+        plts[[i]] = ggplot(demTopN[1:amount,], aes_string(x=identity, y=vars[i]))+
+        ggtitle(str_interp("${orient} ${amount}: ${vars[i]}"))+
+        theme(axis.text.x = element_text(angle = 45))
+        if (cat == 1) {
+        plts[[i]] <- plts[[i]] + geom_bar(stat="identity", aes_string(fill="hdi_cat"))
+        } else {
+        plts[[i]] <- plts[[i]] + geom_bar(stat="identity")
+        }
+    }
+    grid.arrange(grobs=plts, nrow=length(vars))
+    }
+}
+```
+
+
+## Basic metrics selected
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+metric <- data.frame(variables = params$variables)
+for (i in 1:length(params$metric)) {
+    metric[,params$metric[i]] = rep(0, length(params$variables))
+    for (j in 1:length(params$variables)) {
+        if (params$metric[i] == 'Mean') {
+            metric[j,params$metric[i]] = mean(params$dataset[,params$variables[j]])
+        } else if (params$metric[i] == 'Median') {
+            metric[j,params$metric[i]] = median(params$dataset[,params$variables[j]])
+        } else if (params$metric[i] == 'Max') {
+            metric[j,params$metric[i]] = max(params$dataset[,params$variables[j]])
+        } else if (params$metric[i] == 'Min') {
+            metric[j,params$metric[i]] = min(params$dataset[,params$variables[j]])
+        }
+    }
+}
+knitr::kable(
+    metric,
+    booktabs=TRUE,
+    longtable=TRUE,
+    caption="Basic metrics"
+)
+```
+
+## Top N for Variables selected
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE, fig.width=plotWidthInches, fig.height=plotHeightInches}
+topn_barplot(dataset=params$dataset,
+             identity=params$identity,
+             vars=params$variables,
+             orient=params$orient,
+             amount=params$amount,
+             cat=params$cat)
+```
